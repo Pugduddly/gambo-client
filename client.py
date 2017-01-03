@@ -27,7 +27,7 @@ import sys, time, requests
 headers = {"user-agent": "gambo-client/1.0"}
 
 createdata = {"type": "asdf"}
-joindata   = {"userName": "asdf"}
+joindata   = {"userName": "3rr0r"}
 
 sess = requests.Session()
 
@@ -62,7 +62,12 @@ def consolePrint(line):
 def main():
     if len(sys.argv) == 1:
         print "argv[1] != IP"
+        print "argv[2] != username"
         return 1
+    if len(sys.argv) == 2:
+        print "argv[2] != username"
+        return 1
+    joindata["userName"] = sys.argv[2]
     print "\033c"
     consolePrint("attempting to create game")
     ip = sys.argv[1]
