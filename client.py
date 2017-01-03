@@ -22,7 +22,7 @@
 #  
 #  
 
-import sys, time, requests
+import sys, time, requests, traceback
 from terminalsize import get_terminal_size
 
 headers = {"user-agent": "gambo-client-cli/1.0"}
@@ -50,6 +50,8 @@ clearstring = "\033c\033[44m\033[3;J\033[H\033[2J"
 
 playing = False
 
+pnbr = 0
+
 def drawWindowBox(x, y, w, h):
     sys.stdout.write('\033[%d;%dH\033[1;47;97m' % (y + 1, x + 1))
     sys.stdout.write(sepchar[2])
@@ -57,17 +59,20 @@ def drawWindowBox(x, y, w, h):
         sys.stdout.write(sepchar[0])
     sys.stdout.write('\033[0;47;30m')
     sys.stdout.write(sepchar[3])
+    sys.stdout.flush()
     for _y in range(y + 2, y + h + 2):
         sys.stdout.write('\033[0;47;30m\033[%d;%dH\033[1;47;97m%s' % (_y, x - w + 3, sepchar[1]))
         for _x in range(x + 2, x + w + 1):
             sys.stdout.write(' ')
         sys.stdout.write('\033[0;47;30m\033[%d;%dH%s\033[0;30;40m  ' % (_y, x + 2, sepchar[1]))
         #drawSpinner()
+    sys.stdout.flush()
     sys.stdout.write('\033[%d;%dH\033[0;47;30m' % (_y + 1, x - w + 3))
     sys.stdout.write(sepchar[4])
     for _x in range(x + 1, x + w - 1):
         sys.stdout.write(sepchar[0])
     sys.stdout.write(sepchar[5])
+    sys.stdout.flush()
     sys.stdout.write("\033[0;30;40m  \033[%d;%dH" % (_y + 2, x - w + 5))
     for _x in range(x + 2, x + w + 2):
         sys.stdout.write("\033[0;30;40m ")
@@ -149,8 +154,37 @@ def clear():
 	sys.stdout.write(clearstring)
 	sys.stdout.flush()
 
+def drawGame(r):
+    tsize = get_terminal_size()
+    tsp = consolesize + 5
+    print "\033[%d;0H" % (tsp)
+    print "\033[%d;1H\033[0;1;44;36m player %s's turn" % (tsp + 1, r.json()["playerTurn"]["userName"])
+    plrs = "players: %s%s, %s%s" % (playercolors[1], r.json()["players"][0]["userName"], playercolors[2], r.json()["players"][1]["userName"])
+    plrs2 = "players: %s, %s" % (r.json()["players"][0]["userName"], r.json()["players"][1]["userName"])
+    print "\033[%d;%dH%s" % (tsp + 1, tsize[0] - len(plrs2), plrs)
+    drawWindowBox((tsize[0] / 2) - 9, tsp + 1, 16, 5)
+    drawWindowLine((tsize[0] / 2) - 9, tsp + 3, 16)
+    inv = r.json()["players"][pnbr - 1]["inventory"]
+    invt = ""
+    invl = 0
+    for a in inv:
+        invt += "\033[0;7m%s%d " % (playercolors[pnbr], a)
+        invl += 2
+    print "\033[%d;%dH%s" % (tsp + 3, (tsize[0] / 2) - (invl / 2), invt)
+    print "\033[0m"
+    board = r.json()["board"]
+    y = tsp + 5
+    for a in board:
+        x = (tsize[0] / 2) - len(board[0])
+        for b in a:
+            print "\033[%d;%dH\033[7m%s%s " % (y, x, playercolors[b[0]], playerpieces[b[1]])
+            x += 2
+        y += 1
+    sys.stdout.write("\033[%d;0H\033[0;47;30m\033[2K\033[%d;2H" % (tsize[1] - 1, tsize[1] - 1))
+    sys.stdout.flush()
+
 def main():
-    global playing
+    global playing, pnbr
     if len(sys.argv) == 1:
         print "argv[1] != IP"
         print "argv[2] != username"
@@ -192,31 +226,7 @@ def main():
         tsize = get_terminal_size()
         clear()
         updateConsole()
-        tsp = consolesize + 5
-        print "\033[%d;0H" % (tsp)
-        print "\033[%d;1H\033[0;1;44;36m player %s's turn" % (tsp + 1, r.json()["playerTurn"]["userName"])
-        plrs = "players: %s%s, %s%s" % (playercolors[0], r.json()["players"][0]["userName"], playercolors[1], r.json()["players"][1]["userName"])
-        print "\033[%d;%dH%s" % (tsp + 1, tsize[0] - len(plrs), plrs)
-        drawWindowBox((tsize[0] / 2) - 9, tsp + 1, 16, 5)
-        drawWindowLine((tsize[0] / 2) - 9, tsp + 3, 16)
-        inv = r.json()["players"][pnbr - 1]["inventory"]
-        invt = ""
-        invl = 0
-        for a in inv:
-            invt += "\033[7;40m%s%d " % (playercolors[pnbr], a)
-            invl += 2
-        print "\033[%d;%dH%s" % (tsp + 3, (tsize[0] / 2) - (invl / 2), invt)
-        print "\033[0m"
-        board = r.json()["board"]
-        y = tsp + 5
-        for a in board:
-            x = (tsize[0] / 2) - len(board[0])
-            for b in a:
-                print "\033[%d;%dH\033[7m%s%s " % (y, x, playercolors[b[0]], playerpieces[b[1]])
-                x += 2
-            y += 1
-        sys.stdout.write("\033[%d;0H\033[0;47;30m\033[2K\033[%d;2H" % (tsize[1] - 1, tsize[1] - 1))
-        sys.stdout.flush()
+        drawGame(r)
         if r.json()["playerTurn"]["userName"] == joindata["userName"]:
             print "type from(piece size or x,y):to(x,y) to move:",
             move = raw_input().strip()
@@ -267,4 +277,6 @@ if __name__ == '__main__':
         sys.exit(main())
     except KeyboardInterrupt:
         print "\033[0m\033cGoodbye"
+    except Exception, e:
+		print "\033[0m\033c%s" % (traceback.format_exc())
 
