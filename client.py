@@ -155,7 +155,7 @@ def main():
             playing = False
     print "\033c"
     consolePrint("game over")
-    consolePrint("winner is %s (player %d)" % (r.json()["userName"], r.json()["playerNumber"]))
+    consolePrint("winner is %s (player %d)" % (r.json()["winner"]["userName"], r.json()["winner"]["playerNumber"]))
     consolePrint("bye")
     return 0
 
