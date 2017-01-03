@@ -142,21 +142,25 @@ def main():
                     consolePrint("moved piece to %s" % (mv[1]))
         else:
             print "waiting for player %s to move" % (r.json()["playerTurn"]["userName"])
-            waiting = True
-            while waiting:
-                time.sleep(0.25)
-                r = sess.get('http://%s:4000/api/games/%s' % (ip, gid), headers=headers)
-                waiting = r.json()["playerTurn"]["userName"] != joindata["userName"]
+            try:
+                waiting = True
+                while waiting:
+                    time.sleep(0.25)
+                    r = sess.get('http://%s:4000/api/games/%s' % (ip, gid), headers=headers)
+                    waiting = r.json()["playerTurn"]["userName"] != joindata["userName"]
+            except KeyError:
+                pass
         r = sess.get('http://%s:4000/api/games/%s' % (ip, gid), data=joindata, headers=headers)
         if r.status_code != 200:
             consolePrint(errorcolor + "%d from %s: %s" % (r.status_code, ip, r.text))
             return 1
         if r.json()["status"] == "GAME_OVER":
             playing = False
-    print "\033c"
     consolePrint("game over")
     consolePrint("winner is %s (player %d)" % (r.json()["winner"]["userName"], r.json()["winner"]["playerNumber"]))
     consolePrint("bye")
+    print "\033c"
+    updateConsole()
     return 0
 
 if __name__ == '__main__':
