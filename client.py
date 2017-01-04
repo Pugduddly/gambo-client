@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 #  client.py
+#  Reference Gambo client
 #  
 #  Copyright 2017 Evan Carlson <pugduddly@gmail.com>
 #  
@@ -22,10 +23,10 @@
 #  
 #  
 
-import sys, time, requests, traceback
-from terminalsize import get_terminal_size
+import sys, time, traceback, requests
+from lib.terminalsize import get_terminal_size
 
-headers = {"user-agent": "gambo-client-cli/1.0"}
+headers = {"user-agent": "gambo-client/1.0"}
 
 createdata = {"type": "asdf"}
 joindata   = {"userName": "3rr0r"}
@@ -51,32 +52,38 @@ clearstring = "\033c\033[44m\033[3;J\033[H\033[2J"
 playing = False
 
 pnbr = 0
+invs = 0
 
 def drawWindowBox(x, y, w, h):
-    sys.stdout.write('\033[%d;%dH\033[1;47;97m' % (y + 1, x + 1))
+    sys.stdout.write('\033[%d;%dH\033[1m\033[47;97m' % (y + 1, x + 1))
     sys.stdout.write(sepchar[2])
+    sys.stdout.flush()
     for x in range(x + 1, x + w - 1):
         sys.stdout.write(sepchar[0])
     sys.stdout.write('\033[0;47;30m')
     sys.stdout.write(sepchar[3])
     sys.stdout.flush()
     for _y in range(y + 2, y + h + 2):
-        sys.stdout.write('\033[0;47;30m\033[%d;%dH\033[1;47;97m%s' % (_y, x - w + 3, sepchar[1]))
+        sys.stdout.write('\033[0;47;30m\033[%d;%dH\033[1m\033[47;97m%s' % (_y, x - w + 3, sepchar[1]))
         for _x in range(x + 2, x + w + 1):
             sys.stdout.write(' ')
         sys.stdout.write('\033[0;47;30m\033[%d;%dH%s\033[0;30;40m  ' % (_y, x + 2, sepchar[1]))
         #drawSpinner()
     sys.stdout.flush()
-    sys.stdout.write('\033[%d;%dH\033[0;47;30m' % (_y + 1, x - w + 3))
+    sys.stdout.write('\033[%d;%dH\033[1;47;97m' % (_y + 1, x - w + 3))
+    sys.stdout.flush()
     sys.stdout.write(sepchar[4])
+    sys.stdout.write('\033[0;47;30m')
+    sys.stdout.flush()
     for _x in range(x + 1, x + w - 1):
         sys.stdout.write(sepchar[0])
     sys.stdout.write(sepchar[5])
     sys.stdout.flush()
     sys.stdout.write("\033[0;30;40m  \033[%d;%dH" % (_y + 2, x - w + 5))
+    sys.stdout.flush()
     for _x in range(x + 2, x + w + 2):
         sys.stdout.write("\033[0;30;40m ")
-    sys.stdout.flush()
+        sys.stdout.flush()
 
 def drawWindowLine(x, y, w):
     sys.stdout.write('\033[%d;%dH\033[1;47;97m' % (y + 1, x + 1))
@@ -90,7 +97,8 @@ def updateConsole():
     global console, consolesize
     tsize = get_terminal_size()
     if playing:
-        consolesize = tsize[1] - 16
+        #consolesize = tsize[1] - 16
+        consolesize = tsize[1] / 3
     else:
         consolesize = tsize[1] - 6
     print "\033[0;2H\033[0;1;44;36mGambo client 1.0"
@@ -104,13 +112,16 @@ def updateConsole():
             console.remove(console[0])
     y = 4
     for line in console:
+        if len(line) > tsize[0] - 6:
+            line = line[:(tsize[0] - 7)]
+            line += u'…'
         print "\033[%d;2H\033[0;47;30m %s" % (y, line)
         y += 1
     print "\033[0m\033[%d;0H" % (consolesize + 3)
 
 def consolePrint(line):
     global console
-    console += [line]
+    console += str(line).split('\n')
     updateConsole()
 
 def drawSpinner():
@@ -162,18 +173,20 @@ def drawGame(r):
     plrs = "players: %s%s, %s%s" % (playercolors[1], r.json()["players"][0]["userName"], playercolors[2], r.json()["players"][1]["userName"])
     plrs2 = "players: %s, %s" % (r.json()["players"][0]["userName"], r.json()["players"][1]["userName"])
     print "\033[%d;%dH%s" % (tsp + 1, tsize[0] - len(plrs2), plrs)
-    drawWindowBox((tsize[0] / 2) - 9, tsp + 1, 16, 5)
-    drawWindowLine((tsize[0] / 2) - 9, tsp + 3, 16)
     inv = r.json()["players"][pnbr - 1]["inventory"]
     invt = ""
     invl = 0
     for a in inv:
         invt += "\033[0;7m%s%d " % (playercolors[pnbr], a)
         invl += 2
-    print "\033[%d;%dH%s" % (tsp + 3, (tsize[0] / 2) - (invl / 2), invt)
+    wbw, wbh = invs + 4, 5
+    wbx, wby = (tsize[0] / 2) - ((invs + 4) / 2) - 1, ((((tsize[1] - 1) - (tsp)) / 2) - (int(wbh / 2))) + (tsp + 1) - 3
+    drawWindowBox(wbx, wby, wbw, wbh)
+    drawWindowLine(wbx, wby + 2, wbw)
+    print "\033[%d;%dH%s" % (wby + 2, (tsize[0] / 2) - (invl / 2), invt)
     print "\033[0m"
     board = r.json()["board"]
-    y = tsp + 5
+    y = wby + 4
     for a in board:
         x = (tsize[0] / 2) - len(board[0])
         for b in a:
@@ -184,7 +197,7 @@ def drawGame(r):
     sys.stdout.flush()
 
 def main():
-    global playing, pnbr
+    global playing, pnbr, invs
     if len(sys.argv) == 1:
         print "argv[1] != IP"
         print "argv[2] != username"
@@ -221,6 +234,7 @@ def main():
             drawSpinner()
         clearSpinner()
         consolePrint("player %s joined game %s as player %d" % (r.json()["players"][len(r.json()["players"]) - 1]["userName"], gid, r.json()["players"][len(r.json()["players"]) - 1]["playerNumber"]))
+    invs = len(r.json()["players"][pnbr - 1]["inventory"]) * 2
     playing = True
     while playing:
         tsize = get_terminal_size()
@@ -270,6 +284,7 @@ def main():
     consolePrint("game over")
     consolePrint("winner is %s (player %d)" % (r.json()["winner"]["userName"], r.json()["winner"]["playerNumber"]))
     consolePrint("bye")
+    drawGame(r)
     return 0
 
 if __name__ == '__main__':
